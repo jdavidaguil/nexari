@@ -1,0 +1,34 @@
+{
+  "name": "Nexari Dev",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "features": {
+    "ghcr.io/devcontainers/features/aws-cli:1": {}
+  },
+  "postCreateCommand": "pip install -e '.[sagemaker,dev]'",
+  "secrets": {
+    "AWS_ACCESS_KEY_ID": {},
+    "AWS_SECRET_ACCESS_KEY": {},
+    "AWS_REGION": {},
+    "HF_TOKEN": {},
+    "HF_NAMESPACE": {},
+    "NEXARI_BEDROCK_MODEL_ID": {},
+    "SAGEMAKER_ROLE_ARN": {},
+    "NEXARI_S3_BUCKET": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.ruff",
+        "GitHub.copilot"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "editor.formatOnSave": true
+      }
+    }
+  },
+  "remoteEnv": {
+    "NEXARI_LLM_BACKEND": "bedrock"
+  }
+}
