@@ -15,9 +15,8 @@ BACKBONE_DEFAULTS = {
 SYSTEM_PROMPT = """You are a model selection expert for Hugging Face fine-tuning.
 Given a task definition and chosen dataset, recommend the single best backbone model.
 Optimize for: task fit > inference speed > model size (smaller is better for v0).
-Respond ONLY with valid JSON:
-{"model_id": "exact HuggingFace model id", "rationale": "2-3 sentence explanation", "estimated_train_time_minutes": 10, "tokenizer_id": "usually same as model_id"}
-No preamble. No markdown. JSON only."""
+Respond ONLY with valid JSON, no markdown fences:
+{"model_id": "exact HuggingFace model id", "rationale": "2-3 sentence explanation", "estimated_train_time_minutes": 10, "tokenizer_id": "usually same as model_id"}"""
 
 @dataclass
 class BackboneSelection:
@@ -28,10 +27,19 @@ class BackboneSelection:
 
 def select_backbone(task: TaskDefinition, dataset_id: str, llm: LLMClient | None = None) -> BackboneSelection:
     client = llm or get_client()
-    user_prompt = f"Task: {task.task_type.value}, Domain: {task.domain}, Dataset: {dataset_id}. Select best backbone."
+    user_prompt = f"""Task type: {task.task_type.value}
+Domain: {task.domain}
+Input: {task.input_description}
+Output: {task.output_description}
+Metric: {task.suggested_metric}
+Dataset: {dataset_id}
+
+Select the single best small backbone model for fine-tuning on Hugging Face. Prefer distilbert, bert-base, or roberta-base variants."""
+
     raw = client.complete(system=SYSTEM_PROMPT, user=user_prompt, max_tokens=512)
+    raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     try:
-        data = json.loads(raw.strip())
+        data = json.loads(raw)
         return BackboneSelection(
             model_id=data["model_id"],
             tokenizer_id=data.get("tokenizer_id", data["model_id"]),
