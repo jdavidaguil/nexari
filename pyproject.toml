@@ -10,10 +10,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{ name = "J.D. Aguilera" }]
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["nexari*"]
 keywords = ["machine-learning", "mlops", "autonomous-agent", "huggingface", "bedrock"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -44,8 +40,12 @@ dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.10"]
 nexari = "nexari.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/jdaguilera/nexari"
-Issues = "https://github.com/jdaguilera/nexari/issues"
+Homepage = "https://github.com/jdavidaguil/nexari"
+Issues = "https://github.com/jdavidaguil/nexari/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nexari*"]
 
 [tool.ruff]
 line-length = 100
