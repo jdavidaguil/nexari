@@ -24,8 +24,8 @@ No preamble. No markdown. JSON only."""
 def discover(task: TaskDefinition, llm: LLMClient | None = None, limit: int = 10) -> list:
     client = llm or get_client()
     api = HfApi()
-    query = f"{task.domain} {task.task_type.value.replace('_', ' ')}"
-    results = list(api.list_datasets(search=query, limit=limit, sort="downloads", direction=-1))
+    query = task.domain
+    results = list(api.list_datasets(search=query, limit=limit))
     raw_candidates = [{"dataset_id": ds.id, "downloads": getattr(ds, "downloads", 0) or 0,
                        "likes": getattr(ds, "likes", 0) or 0, "tags": list(ds.tags or []),
                        "description": (ds.description or "")[:300]} for ds in results]

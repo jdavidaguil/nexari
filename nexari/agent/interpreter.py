@@ -50,6 +50,8 @@ def interpret(intent: str, llm: LLMClient | None = None) -> TaskDefinition:
     """Parse a natural language intent string into a TaskDefinition."""
     client = llm or get_client()
     raw = client.complete(system=SYSTEM_PROMPT, user=intent, max_tokens=512)
+    raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
 
     try:
         data = json.loads(raw.strip())
