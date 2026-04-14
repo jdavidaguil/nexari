@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexari"
@@ -8,8 +8,12 @@ version = "0.1.0"
 description = "From intent to deployed model. Autonomous ML pipeline agent."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "Apache-2.0"
 authors = [{ name = "J.D. Aguilera" }]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nexari*"]
 keywords = ["machine-learning", "mlops", "autonomous-agent", "huggingface", "bedrock"]
 classifiers = [
     "Development Status :: 3 - Alpha",
