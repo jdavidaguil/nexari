@@ -1,0 +1,27 @@
+{
+  "intent": "classify customer support tickets by urgency",
+  "completed_steps": [
+    1,
+    2,
+    3
+  ],
+  "task": {
+    "raw_intent": "classify customer support tickets by urgency",
+    "task_type": "text_classification",
+    "domain": "customer support",
+    "input_description": "Customer support ticket text containing issue description, customer message, or inquiry",
+    "output_description": "Urgency classification label (e.g., low, medium, high, or critical)",
+    "suggested_metric": "f1",
+    "notes": "Multi-class classification problem where class imbalance is likely (fewer critical/high urgency tickets). F1 score preferred over accuracy to account for imbalanced classes. May need to prioritize recall for high-urgency cases to avoid missing critical issues."
+  },
+  "dataset_id": "Tobi-Bueck/customer-support-tickets",
+  "candidates": null,
+  "backbone": {
+    "model_id": "distilbert-base-uncased",
+    "tokenizer_id": "distilbert-base-uncased",
+    "rationale": "DistilBert is ideal for customer support ticket classification: it's 40% smaller and 60% faster than BERT while retaining 97% of its performance. For text classification with F1 optimization, it provides excellent accuracy-speed tradeoff. The uncased variant works well for support tickets which often have inconsistent capitalization.",
+    "estimated_train_time_minutes": 15
+  },
+  "model_path": null,
+  "endpoint_url": null
+}

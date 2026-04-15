@@ -136,18 +136,19 @@ def _train_local(
         num_train_epochs=DEFAULT_EPOCHS,
         per_device_train_batch_size=DEFAULT_BATCH_SIZE,
         per_device_eval_batch_size=DEFAULT_BATCH_SIZE,
-        eval_strategy="epoch",
+        evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         metric_for_best_model=task.suggested_metric,
         logging_steps=50,
         report_to="none",
         fp16=False,
+        no_cuda=True,
     )
     trainer = Trainer(
         model=model, args=training_args,
         train_dataset=train_ds, eval_dataset=eval_ds,
-        processing_class=tokenizer,
+        tokenizer=tokenizer,
         data_collator=DataCollatorWithPadding(tokenizer),
         compute_metrics=compute_metrics,
     )
@@ -190,7 +191,7 @@ def _train_sagemaker(
 
     try:
         import sagemaker
-        from sagemaker.huggingface import HuggingFace
+        from sagemaker.pytorch import PyTorch
     except ImportError:
         raise ImportError("SageMaker backend requires: pip install sagemaker")
 
@@ -245,25 +246,25 @@ def _train_sagemaker(
         data_s3_uri = f"s3://{s3_bucket}/{s3_prefix}/data"
         console.print(f"  [dim]Dataset uploaded to {data_s3_uri}[/]")
 
-    training_script = _sagemaker_training_script()
-    script_path = Path("./sagemaker_train.py")
-    script_path.write_text(training_script)
+    repo_root = Path(__file__).resolve().parents[2]
 
     console.print(f"  [dim]Submitting SageMaker job (spot g4dn.xlarge)...[/]")
     sess = sagemaker.Session(boto_session=boto3.Session(region_name=region))
-    estimator = HuggingFace(
-        entry_point="sagemaker_train.py",
-        source_dir=".",
+    estimator = PyTorch(
+        entry_point="nexari/pipeline/scripts/sagemaker_train.py",
+        source_dir=str(repo_root),
+        dependencies=[],
         role=role_arn,
-        transformers_version="4.36",
-        pytorch_version="2.1",
+        
+        framework_version="2.1",
         py_version="py310",
-        instance_type="ml.g4dn.xlarge",
+        instance_type="ml.c5.2xlarge",
         instance_count=1,
-        use_spot_instances=True,
-        max_wait=3600,
+        use_spot_instances=False,
+        
         max_run=1800,
         sagemaker_session=sess,
+        environment={"HF_TOKEN": os.getenv("HF_TOKEN", "")},
         hyperparameters={
             "model_id": backbone.model_id,
             "epochs": DEFAULT_EPOCHS,
@@ -288,89 +289,8 @@ def _train_sagemaker(
             tar.extractall(str(output_path))
 
     _save_metadata(output_path, task, dataset_id, backbone, label2id, id2label, text_col)
-    script_path.unlink(missing_ok=True)
     console.print(f"  [green]✓[/] Model saved to {output_path}")
     return str(output_path)
-
-
-def _sagemaker_training_script() -> str:
-    return '''
-import os, json, argparse, numpy as np
-from pathlib import Path
-from datasets import load_from_disk
-from transformers import (
-    AutoTokenizer, AutoModelForSequenceClassification,
-    TrainingArguments, Trainer, DataCollatorWithPadding,
-)
-import evaluate
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model_id", default="distilbert-base-uncased")
-    parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--batch_size", type=int, default=16)
-    parser.add_argument("--training_dir", default=os.environ.get("SM_CHANNEL_TRAINING", "/opt/ml/input/data/training"))
-    parser.add_argument("--output_dir", default=os.environ.get("SM_MODEL_DIR", "/opt/ml/model"))
-    args = parser.parse_args()
-
-    meta = json.loads((Path(args.training_dir) / "metadata.json").read_text())
-    text_col = meta["text_col"]
-    label2id = meta["label2id"]
-    id2label = {int(k): v for k, v in meta["id2label"].items()}
-    num_labels = meta["num_labels"]
-    metric_name = meta.get("metric", "f1")
-
-    train_ds = load_from_disk(str(Path(args.training_dir) / "train"))
-    eval_ds = load_from_disk(str(Path(args.training_dir) / "test"))
-
-    tokenizer = AutoTokenizer.from_pretrained(args.model_id)
-    def tokenize(batch):
-        return tokenizer(batch[text_col], truncation=True, max_length=128)
-
-    keep = ["labels", "input_ids", "attention_mask", "token_type_ids"]
-    train_ds = train_ds.map(tokenize, batched=True, remove_columns=[c for c in train_ds.column_names if c not in keep])
-    eval_ds = eval_ds.map(tokenize, batched=True, remove_columns=[c for c in eval_ds.column_names if c not in keep])
-
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_id, num_labels=num_labels,
-        id2label=id2label, label2id=label2id, ignore_mismatched_sizes=True,
-    )
-
-    metric = evaluate.load("f1" if metric_name == "f1" else "accuracy")
-    def compute_metrics(eval_pred):
-        logits, labels = eval_pred
-        preds = np.argmax(logits, axis=-1)
-        if metric_name == "f1":
-            return metric.compute(predictions=preds, references=labels, average="weighted")
-        return metric.compute(predictions=preds, references=labels)
-
-    TrainingArguments_kwargs = dict(
-        output_dir=args.output_dir,
-        num_train_epochs=args.epochs,
-        per_device_train_batch_size=args.batch_size,
-        per_device_eval_batch_size=args.batch_size,
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        load_best_model_at_end=True,
-        fp16=True,
-        report_to="none",
-    )
-    Trainer(
-        model=model,
-        args=TrainingArguments(**TrainingArguments_kwargs),
-        train_dataset=train_ds,
-        eval_dataset=eval_ds,
-        processing_class=tokenizer,
-        data_collator=DataCollatorWithPadding(tokenizer),
-        compute_metrics=compute_metrics,
-    ).train()
-
-    model.save_pretrained(args.output_dir)
-    tokenizer.save_pretrained(args.output_dir)
-
-if __name__ == "__main__":
-    main()
-'''
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
